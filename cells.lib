@@ -1,0 +1,352 @@
+library(my_library) {
+
+    time_unit : "1ps";
+    capacitive_load_unit(1, fF);
+
+
+    /* Used for logic delay times. Capacitence also affects the delay. */
+    lu_table_template(delay_2x2) {
+        variable_1 : input_net_transition;
+        variable_2 : total_output_net_capacitance;
+
+        index_1("20, 40");
+        index_2("5, 30");
+    }
+
+
+    /* Used for setup-time constraints */
+    lu_table_template(constraint_2x2) {
+        variable_1 : constrained_pin_transition;
+        variable_2 : related_pin_transition;
+
+        index_1("10, 20");
+        index_2("20, 40");
+    }
+
+
+    cell(INV_X1) {
+		
+        pin(A) {
+            direction : input;
+	    capacitance : 5;
+
+
+        }
+
+        pin(Y) {
+            direction : output;
+            function : "!A";
+
+            timing() {
+                related_pin : "A";
+
+                cell_rise(delay_2x2) {
+                    values(
+                        "50, 100",
+                        "75, 200"
+                    );
+                }
+
+                cell_fall(delay_2x2) {
+                    values(
+                        "70, 140",
+                        "100, 210"
+                    );
+                }
+
+		rise_transition(delay_2x2){
+		   values(
+			"10, 20",
+			"20, 40"
+		   );
+		}
+		
+		fall_transition(delay_2x2){
+		    values(
+			"15, 25",
+			"25, 45"
+		    );
+		}
+            }
+        }
+    }
+
+
+    cell(NAND2_X1) {
+
+        pin(A) {
+            direction : input;
+	    capacitance : 6;
+        }
+
+        pin(B) {
+            direction : input;
+	    capacitance : 6;
+        }
+
+        pin(Y) {
+            direction : output;
+            function : "!(A & B)";
+
+            timing() {
+                related_pin : "A";
+
+                cell_rise(delay_2x2) {
+                    values(
+                        "75, 150",
+                        "100, 300"
+                    );
+                }
+
+                cell_fall(delay_2x2) {
+                    values(
+                        "70, 135",
+                        "105, 280"
+                    );
+                }
+
+		rise_transition(delay_2x2) {
+		    values(
+			"20, 40",
+			"30, 60"
+		    );
+		}
+
+		fall_transition(delay_2x2){
+		    values(
+			"25, 45",
+			"35, 65"
+		    );
+		}
+            }
+
+            timing() {
+                related_pin : "B";
+                timing_type : combinational;
+
+                cell_rise(delay_2x2) {
+                    values(
+                        "80, 140",
+                        "95, 290"
+                    );
+                }
+
+                cell_fall(delay_2x2) {
+                    values(
+                        "70, 135",
+                        "90, 285"
+                    );
+                }
+	
+		rise_transition(delay_2x2) {
+		    values(
+			"22, 44",
+			"32, 64"
+		    );
+		}
+
+		fall_transition(delay_2x2) {
+		    values(
+			"24, 48",
+			"34, 68"
+		    );
+		}
+            }
+        }
+    }
+
+    cell(NAND3_X1) {
+
+    	pin(A) {
+        	direction : input;
+        	capacitance : 7;
+    	}
+
+    	pin(B) {
+        	direction : input;
+        	capacitance : 7;
+    	}
+
+    	pin(C) {
+        	direction : input;
+        	capacitance : 7;
+    	}
+
+    	pin(Y) {
+        	direction : output;
+        	function : "!(A & B & C)";
+
+        	timing() {
+            	    related_pin : "A";
+
+            	    cell_rise(delay_2x2) {
+                	    values(
+                    	        "90, 170",
+                    	        "125, 330"
+                	    );
+            	    }
+
+            	    cell_fall(delay_2x2) {
+                	    values(
+                    		"85, 160",
+                    		"120, 315"
+                	    );
+            	    }
+
+		    rise_transition(delay_2x2) {
+                    	values(
+                        	"34, 50",
+                        	"48, 74"
+                    	);
+                    }
+
+                    fall_transition(delay_2x2) {
+                    	values(
+                        	"36, 54",
+                        	"52, 80"
+                    	);
+                    }
+        	}
+
+        	timing() {
+            	    related_pin : "B";
+
+            	    cell_rise(delay_2x2) {
+                	    values(
+                    		"95, 175",
+                    		"130, 335"
+                	    );
+            	    }
+
+            	    cell_fall(delay_2x2) {
+                	    values(
+                   		"90, 165",
+                    		"125, 320"
+                	    );
+            	    }
+		    rise_transition(delay_2x2) {
+                    	values(
+                        	"37, 52",
+                        	"50, 84"
+                    	);
+                    }
+
+                    fall_transition(delay_2x2) {
+                    	values(
+                        	"34, 52",
+                        	"52, 77"
+                    	);
+                    }
+        	}
+
+        	timing() {
+            	    related_pin : "C";
+
+            	    cell_rise(delay_2x2) {
+                	    values(
+                    		"100, 180",
+                    		"135, 340"
+                	    );
+            	    }
+
+            	    cell_fall(delay_2x2) {
+                	    values(
+                    		"95, 170",
+                    		"130, 325"
+                	    );
+            	    }
+
+		    rise_transition(delay_2x2) {
+                    	values(
+                        	"35, 56",
+                        	"56, 84"
+                    	);
+                    }
+
+                    fall_transition(delay_2x2) {
+                    	values(
+                        	"33, 52",
+                        	"54, 80"
+                    	);
+                    }
+        	}
+    	    }
+	}
+
+
+    cell(DFF_X1) {
+
+        ff(IQ, IQN) {
+            clocked_on : "CLK";
+            next_state : "D";
+        }
+
+        pin(CLK) {
+            direction : input;
+            clock : true;
+	    capacitance : 8;
+        }
+
+        pin(D) {
+            direction : input;
+	    capacitance : 6;
+
+            timing() {
+                related_pin : "CLK";
+                timing_type : setup_rising;
+
+                rise_constraint(constraint_2x2) {
+                    values(
+                        "5, 6",
+                        "7, 8"
+                    );
+                }
+
+                fall_constraint(constraint_2x2) {
+                    values(
+                        "4, 6",
+                        "8, 10"
+                    );
+                }
+            }
+        }
+
+        pin(Q) {
+            direction : output;
+            function : "IQ";
+
+            timing() {
+                related_pin : "CLK";
+                timing_type : rising_edge;
+
+                cell_rise(delay_2x2) {
+                    values(
+                        "200, 400",
+                        "300, 600"
+                    );
+                }
+
+                cell_fall(delay_2x2) {
+                    values(
+                        "250, 450",
+                        "350, 650"
+                    );
+                }
+		
+		rise_transition(delay_2x2) {
+                    values(
+                        "40, 60",
+                        "55, 85"
+                    );
+                }
+
+                fall_transition(delay_2x2) {
+                    values(
+                        "45, 68",
+                        "60, 92"
+                    );
+                }
+            }
+        }
+    }
+}
