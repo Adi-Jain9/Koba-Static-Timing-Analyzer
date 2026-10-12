@@ -69,9 +69,9 @@ For combinational cells, the analyzer:
 
 Linear interpolation is calculated using:
 
-\[
+$$
 d(C)=d_1+\frac{C-C_1}{C_2-C_1}(d_2-d_1)
-\]
+$$
 
 where \(C\) is the calculated load capacitance and \(d_1,d_2\) are the characterized delays at capacitances \(C_1,C_2\).
 
@@ -89,9 +89,9 @@ Propagates signal arrival times through the circuit's combinational logic.
 
 For a combinational gate:
 
-\[
+$$
 AT_{\text{out}}=\max_i(AT_{\text{in},i}+d_i)
-\]
+$$
 
 The analyzer also tracks the predecessor responsible for each maximum arrival time, enabling critical-path reconstruction.
 
@@ -116,15 +116,15 @@ Compares register-to-register paths to determine the most timing-critical endpoi
 
 Total path delay is defined as:
 
-\[
+$$
 D_{\text{total}}=AT_{\text{capture data}}+T_{\text{setup}}
-\]
+$$
 
 For the project's simplified single-clock timing model:
 
-\[
+$$
 \text{Slack}=T_{\text{clock}}-D_{\text{total}}
-\]
+$$
 
 A positive setup slack indicates that the path meets the modeled clock constraint, while a negative slack indicates a setup timing violation.
 
