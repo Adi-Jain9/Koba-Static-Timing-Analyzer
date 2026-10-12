@@ -20,7 +20,10 @@ module circuit (
 	wire n7;
 	wire n8;
 	wire n9;
-	wire n10;
+	
+
+    wire d_internal;
+    wire e_internal;
 
 
 	DFF_X1 FF1 (
@@ -59,7 +62,7 @@ module circuit (
 	NAND2_X1 NAND2 (
 		.A(n2),
 		.B(n5),
-		.Y(d)
+		.Y(d_internal)
 	);
 
 	INV_X1 INV5 (
@@ -86,7 +89,7 @@ module circuit (
 	NAND2_X1 NAND4 (
 		.A(n6),
 		.B(n8),
-		.Y(e)
+		.Y(e_internal)
 	);
 
 	DFF_X1 FF2 (
@@ -94,5 +97,17 @@ module circuit (
 		.D(n9),
 		.Q(f)
 	);
+
+    DFF_X1 FF3 (
+        .CLK(clk),
+        .D(d_internal),
+        .Q(d)
+    );
+
+    DFF_X1 FF4 (
+        .CLK(clk),
+        .D(e_internal),
+        .Q(e)
+    );
 
 endmodule

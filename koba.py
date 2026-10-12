@@ -1579,7 +1579,32 @@ def main():
 
     # build timing paths
     paths = collect_timing_paths(circuit, library, arrival_times, previous)
+    
+    #sort paths from largest delay to smallest delay
+    for i in range(len(paths)):
+        largest = i
 
+        for j in range(i + 1, len(paths)):
+            if(paths[j]["total_delay"] > paths[largest]["total_delay"]):
+               largest = j
+
+
+        temp = paths[i]
+        paths[i] = paths[largest]
+        paths[largest] = temp
+
+    # print all register-to-register timing paths
+    print("Register-to-Register Timing Paths:")
+
+    for path in paths:
+        print()
+        print("Start flip-flop:", path["start_instance"])
+        print("End flip-flop:", path["end_instance"])
+        print("Path:", " -> ".join(path["path"]))
+        print("Total delay:", round(path["total_delay"], 2), "ps")
+        slack = clock["period"] - path["total_delay"]
+        print("Slack:", round(slack, 2), "ps")
+    
     # find largest total delay path
     critical_path = find_critical_path(paths)
 
@@ -1587,6 +1612,15 @@ def main():
     if critical_path is None:
         print("No register-to-register timing path was found")
         return
+    
+    # export critical path nets for the C++ router
+    file = open("critical_nets.txt", "w")
+
+    for item in critical_path["path"]:
+        if item in nets:
+            file.write(item + "\n")
+
+    file.close()
 
     clock_period = clock["period"]
     total_delay = critical_path["total_delay"]
