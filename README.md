@@ -49,9 +49,9 @@ Each net stores information about its driving pin, connected load pins, and tota
 
 The total load capacitance is calculated from the input capacitances of connected cell pins:
 
-\[
+$$
 C_{\text{load}}=\sum_{i=1}^{N}C_{\text{pin},i}
-\]
+$$
 
 This allows cell delays to vary based on fanout and the capacitance of connected gates.
 
