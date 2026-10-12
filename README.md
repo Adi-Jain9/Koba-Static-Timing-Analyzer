@@ -1,170 +1,215 @@
-# Python Static Timing Analyzer (STA)
+# Static Timing Analyzer (STA)
 
-A custom static timing analysis tool written in Python that parses structural Verilog, Liberty timing libraries, and SDC clock constraints to evaluate circuit timing, identify critical paths, and calculate setup slack.
-
-The project explores how timing information propagates through digital circuits and how cell delays, fanout capacitance, and setup constraints affect circuit performance.
-
-The analyzer also exports timing-critical nets for integration with a separate **C++ timing-driven VLSI router**.
+**A custom Python static timing analyzer for gate-level digital circuits, featuring Liberty-based delay calculations, register-to-register timing analysis, critical-path reconstruction, and integration with a C++ VLSI router.**
 
 ## Overview
 
-Static Timing Analysis (STA) determines whether signals can propagate through a digital circuit within specified timing constraints without requiring functional simulation.
+Static Timing Analysis (STA) evaluates the timing performance of digital circuits without requiring functional simulation. It determines whether signals can propagate between sequential elements within the timing constraints imposed by the clock.
 
-This project implements a simplified gate-level STA flow that:
+This project implements a custom STA engine in Python to explore the algorithms and data structures underlying digital timing analysis.
 
-1. Parses circuit connectivity from structural Verilog.
-2. Extracts cell timing information from Liberty.
-3. Reads clock-period constraints from SDC.
-4. Constructs net connectivity and calculates capacitive loads.
-5. Propagates signal arrival times through combinational logic.
-6. Reconstructs register-to-register timing paths.
-7. Calculates setup slack and identifies the critical path.
-8. Exports critical nets for timing-driven physical routing.
+The analyzer reads structural Verilog, Liberty timing libraries, and SDC clock constraints to construct a circuit connectivity model, calculate cell delays using capacitive loads, propagate signal arrival times, and identify critical register-to-register paths.
 
-## Features
+The project also integrates with a separate [C++ Timing-Driven VLSI Router](https://github.com/Adi-Jain9/timing-driven-vlsi-router), providing timing-critical net information for future physical routing optimization.
 
-### Structural Verilog Parsing
+## Key Features
 
-Implements a custom parser to extract:
+### 1. Custom Verilog, Liberty, and SDC Parsing
 
+Implements parsers that extract circuit structure and timing information from three input formats.
+
+**Structural Verilog (`.v`)**
 - Standard-cell instances and cell types
-- Named pin-to-net connections
 - Primary inputs and outputs
-- Internal wires and signal connectivity
+- Internal signal nets
+- Named pin connections
+- Connectivity between gates and sequential elements
 
-The parsed circuit representation is used to determine how signals travel between cells.
+**Liberty (`.lib`)**
+- Standard-cell definitions
+- Pin directions and input capacitances
+- Combinational timing arcs
+- Rising and falling cell delays
+- Clock-to-Q propagation delays
+- Flip-flop setup constraints
+- Timing lookup tables and interpolation indices
 
-### Liberty Timing Analysis
+**Synopsys Design Constraints (`.sdc`)**
+- Clock name
+- Clock input port
+- Clock period
 
-Parses Liberty (`.lib`) files to extract:
+These inputs are combined to construct an internal representation of the circuit and its timing characteristics.
 
-- Cell and pin definitions
-- Pin direction and input capacitance
-- Input-to-output timing arcs
-- Rising and falling propagation delays
-- Clock-to-Q delays
-- Setup-time constraints
-- Timing lookup tables
+### 2. Circuit Connectivity and Load Capacitance
 
-Cell delays are calculated using output load capacitance and linear interpolation between characterized capacitance points.
+Builds a net-level connectivity representation using Python dictionaries.
 
-The current implementation uses the first input-transition row of each delay table and selects the larger of the rise and fall delays for a simplified worst-case analysis.
+Each net stores information about its driving pin, connected load pins, and total capacitive load.
 
-### Arrival-Time Propagation
+The total load capacitance is calculated from the input capacitances of connected cell pins:
 
-Constructs a net-level connectivity representation and propagates signal arrival times through combinational gates.
+\[
+C_{\text{load}}=\sum_{i=1}^{N}C_{\text{pin},i}
+\]
 
-For each combinational output, the analyzer evaluates the available input-to-output timing arcs and retains the maximum arrival time.
+This allows cell delays to vary based on fanout and the capacitance of connected gates.
 
-The propagation model includes:
+### 3. Liberty-Based Delay Calculation
 
-- Primary inputs initialized with zero arrival time
-- Flip-flop outputs initialized using clock-to-Q delay
-- Output load capacitance calculated from connected input pins
-- Maximum-delay propagation through combinational logic
-- Predecessor tracking for critical-path reconstruction
+Calculates propagation delays using timing arcs extracted from Liberty.
 
-### Critical-Path Analysis
+For combinational cells, the analyzer:
 
-Traces the worst-arriving signal path backward from each register's setup-constrained data input.
+1. Identifies the relevant input-to-output timing arc.
+2. Determines the capacitive load on the output net.
+3. Reads the corresponding rising and falling delay tables.
+4. Uses linear interpolation between characterized capacitance values.
+5. Selects the larger propagation delay for simplified worst-case analysis.
 
-For each path, the analyzer reports:
+Linear interpolation is calculated using:
 
-- Launch and capture flip-flops
-- Sequence of cells and nets
-- Individual cell delays
-- Data arrival time
-- Capture-register setup time
-- Total timing delay
-- Setup slack
+\[
+d(C)=d_1+\frac{C-C_1}{C_2-C_1}(d_2-d_1)
+\]
 
-Setup slack is calculated using:
+where \(C\) is the calculated load capacitance and \(d_1,d_2\) are the characterized delays at capacitances \(C_1,C_2\).
 
-**Slack = Clock Period − (Data Arrival Time + Setup Time)**
+The current implementation uses a fixed input-transition row of the Liberty lookup tables. Full two-dimensional interpolation and slew propagation are not yet implemented.
 
-A path with negative setup slack violates the simplified timing constraint.
+### 4. Arrival-Time Propagation
 
-### Multi-Endpoint Timing Comparison
+Propagates signal arrival times through the circuit's combinational logic.
 
-Analyzes paths terminating at multiple capture flip-flops and ranks them from largest total delay to smallest.
+- Primary inputs are initialized with zero arrival time.
+- Flip-flop outputs are initialized using their clock-to-Q delay.
+- Combinational outputs are evaluated after their input arrival times become available.
+- Each input-to-output timing arc contributes a candidate arrival time.
+- The maximum candidate arrival time is retained for each output net.
 
-This makes it possible to identify the most timing-critical register-to-register path in a circuit containing multiple logic branches.
+For a combinational gate:
 
-### Timing-Driven Router Integration
+\[
+AT_{\text{out}}=\max_i(AT_{\text{in},i}+d_i)
+\]
 
-Exports the critical path's net names to `critical_nets.txt`.
+The analyzer also tracks the predecessor responsible for each maximum arrival time, enabling critical-path reconstruction.
 
-This output is used by a companion C++ VLSI routing project to identify timing-sensitive connections.
+### 5. Multi-Endpoint Timing Analysis
 
-**Companion project:** [Timing-Driven VLSI Router](https://github.com/Adi-Jain9/timing-driven-vlsi-router)
+Collects and compares timing paths terminating at multiple flip-flop data inputs.
 
-The router currently parses placement, LEF, and Verilog data, builds a routing grid, and imports STA-generated critical nets. Timing-priority path routing is under development.
+For each capture register, the analyzer:
 
-## Example Timing Results
+- Identifies the data input with a setup constraint.
+- Retrieves the corresponding arrival time.
+- Traces the maximum-arrival path backward through combinational logic.
+- Identifies the launching flip-flop.
+- Includes the capture flip-flop's setup requirement.
+- Calculates total timing delay and setup slack.
 
-The current test circuit contains four flip-flops and multiple branching combinational paths.
+The current implementation reports one maximum-arrival path per eligible endpoint rather than enumerating every possible path.
 
-Clock period: **730 ps**
+### 6. Critical-Path Identification
 
-| Priority | Timing path | Total delay | Setup slack |
-|---|---|---:|---:|
-| 1 | FF1 → FF4 | 720.2 ps | 9.8 ps |
-| 2 | FF1 → FF2 | 710.6 ps | 19.4 ps |
-| 3 | FF1 → FF3 | 700.0 ps | 30.0 ps |
+Compares register-to-register paths to determine the most timing-critical endpoint.
 
-### Critical Path
+Total path delay is defined as:
+
+\[
+D_{\text{total}}=AT_{\text{capture data}}+T_{\text{setup}}
+\]
+
+For the project's simplified single-clock timing model:
+
+\[
+\text{Slack}=T_{\text{clock}}-D_{\text{total}}
+\]
+
+A positive setup slack indicates that the path meets the modeled clock constraint, while a negative slack indicates a setup timing violation.
+
+Paths are ranked by total delay, with the longest path considered critical under the shared clock-period assumption.
+
+## Example Results
+
+The test circuit contains 15 standard-cell instances:
+
+- 4 D flip-flops
+- 7 inverters
+- 3 two-input NAND gates
+- 1 three-input NAND gate
+
+The circuit contains multiple reconvergent combinational branches and three register-to-register capture endpoints.
+
+**Clock Period: 730 ps**
+
+| Priority | Launch → Capture | Total Delay | Setup Slack | Status |
+|---|---|---:|---:|---|
+| 1 | FF1 → FF4 | 720.2 ps | 9.8 ps | PASS |
+| 2 | FF1 → FF2 | 710.6 ps | 19.4 ps | PASS |
+| 3 | FF1 → FF3 | 700.0 ps | 30.0 ps | PASS |
+
+### Identified Critical Path
 
 ```text
-FF1 -> q1 -> INV1 -> n1 -> INV3 -> n3
-    -> NAND1 -> n4 -> NAND3 -> n8
-    -> NAND4 -> e_internal -> FF4
+FF1
+  |
+  q1
+  |
+ INV1
+  |
+  n1
+  |
+ INV3
+  |
+  n3
+  |
+ NAND1
+  |
+  n4
+  |
+ NAND3
+  |
+  n8
+  |
+ NAND4
+  |
+e_internal
+  |
+ FF4
 ```
 
-**Critical-path timing breakdown:**
+**Cell delay breakdown**
 
 ```text
-FF1 clock-to-Q:    250.0 ps
-INV1:               84.0 ps
-INV3:               75.6 ps
-NAND1:             125.2 ps
-NAND3:              93.0 ps
-NAND4:              82.4 ps
-FF4 setup:          10.0 ps
----------------------------
-Total delay:       720.2 ps
-Clock period:      730.0 ps
-Setup slack:         9.8 ps
+FF1 clock-to-Q       250.0 ps
+INV1                  84.0 ps
+INV3                  75.6 ps
+NAND1                125.2 ps
+NAND3                 93.0 ps
+NAND4                 82.4 ps
+FF4 setup             10.0 ps
+--------------------------------
+Total delay          720.2 ps
+Clock period         730.0 ps
+Setup slack            9.8 ps
 
 Timing: PASS
 ```
 
-These results are generated using the project's simplified timing model and custom timing library; they are not signoff timing measurements.
+The critical path ends at FF4 and has the smallest setup slack among the three analyzed endpoints.
 
-## Project Files
+These results are based on the project's custom timing library and simplified delay model, not a production signoff analysis.
 
-The primary analysis files are:
+## Integration with Timing-Driven Physical Routing
 
-| File | Purpose |
-|---|---|
-| `koba.py` | Python STA implementation |
-| `koba.v` | Structural Verilog test circuit |
-| `cells.lib` | Cell timing and capacitance information |
-| `koba.sdc` | Clock-period constraints |
-| `critical_nets.txt` | Generated list of critical-path nets |
+The STA project serves as the timing-analysis component of a larger VLSI design automation workflow.
 
-## Running the Analyzer
+After identifying the critical path, the analyzer exports its signal nets to a text file:
 
-**Requirements:** Python 3 and the circuit input files.
+**`critical_nets.txt`**
 
-Run the analyzer from the directory containing the input files:
-
-```bash
-python3 koba.py
-```
-
-The program parses the circuit and timing constraints, calculates register-to-register timing paths, and prints the timing report.
-
-It also generates `critical_nets.txt`, containing the critical path's net names:
+Example:
 
 ```text
 q1
@@ -175,51 +220,126 @@ n8
 e_internal
 ```
 
-## Implementation Details
+The companion C++ router reads this file alongside structural Verilog, LEF geometry, and cell placement information.
 
-The analyzer is implemented in Python using custom parsing and timing-analysis logic rather than an external STA engine.
+This provides a foundation for routing timing-sensitive connections before less critical connections.
 
-**Important implementation choices:**
+**Related repository:** [Timing-Driven VLSI Router](https://github.com/Adi-Jain9/timing-driven-vlsi-router)
 
-- Net-level connectivity is represented with Python dictionaries.
-- Total load capacitance is computed from connected input pins.
-- Timing arcs are selected using Liberty `related_pin` information.
-- Cell delays are interpolated from timing lookup tables.
-- Arrival times are propagated through combinational logic.
-- A predecessor record tracks the input responsible for the maximum arrival time at each net.
-- Timing paths are reconstructed by tracing predecessors backward from capture-register data pins.
-- Paths are ranked by total delay for the single-clock test circuit.
+The physical routing and optimization stages are being developed separately.
 
-## Current Limitations
+## Project Structure
 
-This project is an educational STA implementation and does not replace a production timing engine.
+Core project files:
 
-Current limitations include:
+```text
+static-timing-analyzer/
+├── koba.py             # Python STA implementation
+├── koba.v              # Structural Verilog test circuit
+├── cells.lib           # Custom Liberty timing library
+├── koba.sdc            # Clock timing constraints
+├── critical_nets.txt   # Generated critical-path net list
+└── README.md           # Project documentation
+```
 
-- Simplified structural Verilog support
-- No full Liberty or SDC language support
-- No physical wire resistance/capacitance extraction
-- No detailed interconnect delay modeling
-- No propagated input slew between cells
-- Only one input-transition row used for cell-delay interpolation
-- Rise/fall propagation simplified to the larger delay
-- No clock-tree latency, skew, or uncertainty modeling
-- No hold-time analysis
-- No full path enumeration; the analyzer retains the maximum-arrival predecessor for each net
-- Primary-input-to-register paths are not included in the register-to-register report
+## Getting Started
 
-## Future Improvements
+### Requirements
 
-- Implement two-dimensional Liberty lookup-table interpolation using both input slew and output capacitance.
-- Propagate rise/fall transition times through the timing graph.
-- Add interconnect RC delay estimates.
-- Extend setup/hold analysis and clock constraints.
-- Report multiple paths per endpoint.
-- Export critical-path branches and slack information for more precise routing priorities.
-- Reevaluate timing after physical routing to study how wire length and congestion affect critical paths.
+- Python 3
+- Structural Verilog test circuit
+- Compatible Liberty timing library
+- SDC clock constraints
 
-## Project Goal
+The implementation uses Python's standard library and does not require an external STA engine.
 
-The objective is to understand and implement the fundamentals of static timing analysis while building toward a combined timing-analysis and physical-routing workflow.
+### Running the Analyzer
 
-By integrating the Python STA with a C++ router, the project aims to explore how timing violations and critical-path information can influence routing decisions and how physical interconnect affects overall circuit performance.
+Clone the repository and navigate to the project directory.
+
+Run:
+
+```bash
+python3 koba.py
+```
+
+The analyzer reads `koba.v`, `cells.lib`, and `koba.sdc` from the current working directory.
+
+### Generated Output
+
+The program reports:
+
+- Register-to-register timing paths
+- Launch and capture registers
+- Cell and net sequences
+- Total path delays
+- Setup slack for each endpoint
+- Overall critical path
+- Individual delays along the critical path
+- Clock period and timing pass/fail status
+
+It also generates `critical_nets.txt` for use by the companion C++ router.
+
+## Implementation
+
+The STA engine is written in Python and implements its parsing, connectivity modeling, delay calculation, and timing propagation directly.
+
+**Core components**
+
+| Component | Responsibility |
+|---|---|
+| `parse_verilog()` | Extract circuit instances and connectivity |
+| `parse_liberty()` | Extract cell definitions and timing data |
+| `parse_sdc()` | Read clock constraints |
+| `build_nets()` | Construct net connectivity and calculate load capacitances |
+| `interpolate_delay()` | Estimate delay from capacitance lookup values |
+| `get_cell_delay()` | Calculate combinational cell propagation delay |
+| `get_clock_to_q_delay()` | Calculate flip-flop clock-to-Q delay |
+| `get_setup_time()` | Determine capture-register setup requirement |
+| `propagate_arrival_times()` | Propagate maximum arrival times and track predecessors |
+| `collect_timing_paths()` | Reconstruct register-to-register timing paths |
+| `find_critical_path()` | Identify the maximum-delay path |
+
+## Scope and Limitations
+
+This is an educational gate-level STA implementation intended to demonstrate fundamental timing-analysis concepts.
+
+The following capabilities are currently outside its implemented scope:
+
+- Full Verilog, Liberty, and SDC language support
+- Full two-dimensional timing-table interpolation
+- Input slew and output transition propagation
+- Separate rising and falling timing-state propagation
+- Extracted interconnect resistance and capacitance
+- Clock skew, clock-tree latency, and uncertainty
+- Hold-time analysis
+- Generated clocks and advanced timing exceptions
+- Complete timing-path enumeration
+- Constrained primary-input-to-register and register-to-output timing analysis
+- Production-level static timing signoff
+
+The current timing engine focuses on simplified single-clock register-to-register setup analysis.
+
+## Future Development
+
+Planned improvements include:
+
+- Input-slew-dependent delay calculations using two-dimensional Liberty interpolation
+- Output slew propagation through the circuit
+- Interconnect RC delay estimation
+- Expanded timing constraint support
+- Hold-time analysis
+- Detailed critical-path and slack reporting
+- Exporting timing-critical pin-to-pin branches rather than only net names
+- Incorporating routed wire-length information into timing calculations
+- Iterative timing analysis and physical routing optimization
+
+## Motivation
+
+Static Timing Analysis plays a central role in digital circuit design, helping engineers identify timing bottlenecks before fabrication.
+
+This project was developed to gain a deeper understanding of the underlying timing algorithms, including graph-based connectivity, delay propagation, capacitive loading, timing constraints, and critical-path reconstruction.
+
+By combining the STA engine with a separate C++ routing project, the broader objective is to investigate how software algorithms can use timing information to guide physical design decisions and improve circuit performance.
+
+The project is an ongoing exploration of **electronic design automation (EDA), VLSI CAD, graph algorithms, and timing-driven design optimization**.
